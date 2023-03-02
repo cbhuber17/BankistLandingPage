@@ -135,10 +135,205 @@ nav.addEventListener('mouseout', handleHover.bind(1));
 // ---------------------------------------------------------------
 // Sticky nav bar (stays at top once scrolling down a little)
 
-const initialCoords = section1.getBoundingClientRect();
+// Code below is a traditional way
+// const initialCoords = section1.getBoundingClientRect();
 
-window.addEventListener('scroll', function (e) {
-  // Not performance optimal since window.scrollY fires every time scrolling happens
-  if (window.scrollY > initialCoords.top) nav.classList.add('sticky');
-  else nav.classList.remove('sticky');
+// window.addEventListener('scroll', function (e) {
+//   // Not performance optimal since window.scrollY fires every time scrolling happens
+//   if (window.scrollY > initialCoords.top) nav.classList.add('sticky');
+//   else nav.classList.remove('sticky');
+// });
+
+// ---------------------------------------------------------------
+
+// Sticky nav bar: Intersection Observer API
+// Playing below
+// const obsCallback = function (entries, observer) {
+//   entries.forEach(entry => )
+// };
+
+// const obsOptions = {
+//   // Root is element target (e.g. section1) is intersecting
+//   // Looking for the viewport when root is null
+//   root: null,
+//   threshold: 0.1, // Percentage of intersection callback will be called
+//   // threshold: [0, 0.2], // Out of view, or 20% in view will trigger the callback
+//   // So this basically means when 10% of section 1 is in view, call the
+//   // callback function.
+// };
+
+// const observer = new IntersectionObserver(obsCallback, obsOptions);
+// observer.observe(section1);
+
+const header = document.querySelector('.header');
+const navHeight = nav.getBoundingClientRect().height;
+
+const stickyNav = function (entries) {
+  const [entry] = entries; // Same as entries[0]
+
+  // Add sticky navbar when observer is not intersecting
+  // with the target.
+  if (!entry.isIntersecting) {
+    nav.classList.add('sticky');
+  }
+};
+
+const obsOptions = {
+  root: null, // Interested in entire viewport
+  threshold: 0, // 0% header visible, call callback
+  rootMargin: `-${navHeight}px`, // 90px added margin to root box
+  // i.e. the threshold appears 90 px before the threshold happens
+};
+
+const headerObserver = new IntersectionObserver(stickyNav, obsOptions);
+
+headerObserver.observe(header);
+
+// ---------------------------------------------------------------
+// Reveal sections
+
+// Get all sections
+const allSections = document.querySelectorAll('.section');
+
+const revealSection = function (entries, observer) {
+  const [entry] = entries;
+
+  // Guard clause
+  if (!entry) return;
+
+  entry.target.classList.remove('section--hidden');
+
+  // Stop observing to prevent excessive event firing
+  observer.unobserve(entry.target);
+};
+
+const revealOptions = {
+  root: null,
+  threshold: 0.15,
+};
+
+const sectionObserver = new IntersectionObserver(revealSection, revealOptions);
+
+allSections.forEach(function (section) {
+  sectionObserver.observe(section);
+  section.classList.add('section--hidden');
+});
+
+// ---------------------------------------------------------------
+// Lazy loading images
+// Capture all elements that have the property "data-src"
+const imgTargets = document.querySelectorAll('img[data-src]');
+
+const loadImg = function (entries, observer) {
+  const [entry] = entries;
+
+  if (!entry.isIntersecting) return;
+
+  // Replace src with data-src
+  entry.target.src = entry.target.dataset.src;
+
+  // Listen for load event and act on it
+  entry.target.addEventListener('load', function () {
+    // Remove blur filter
+    entry.target.classList.remove('lazy-img');
+  });
+
+  observer.unobserve(entry.target);
+};
+
+const imgOptions = {
+  root: null,
+  threshold: 0,
+  rootMargin: '200px', // Make sure images are loaded before approaching them
+};
+
+const imgObserver = new IntersectionObserver(loadImg, imgOptions);
+
+imgTargets.forEach(img => imgObserver.observe(img));
+
+// ---------------------------------------------------------------
+// Slider with images and paragraph
+
+const slides = document.querySelectorAll('.slide');
+const btnLeft = document.querySelector('.slider__btn--left');
+const btnRight = document.querySelector('.slider__btn--right');
+const dotContainer = document.querySelector('.dots');
+
+let curSlide = 0;
+const maxSlide = slides.length;
+
+const createDots = function () {
+  slides.forEach(function (_, i) {
+    dotContainer.insertAdjacentHTML(
+      'beforeend',
+      `<button class="dots__dot" data-slide="${i}"></button>`
+    );
+  });
+};
+
+createDots();
+
+const activateDot = function (slide) {
+  document
+    .querySelectorAll('.dots__dot')
+    .forEach(dot => dot.classList.remove('dots__dot--active'));
+
+  document
+    .querySelector(`.dots__dot[data-slide="${slide}"]`)
+    .classList.add('dots__dot--active');
+};
+
+activateDot(0);
+
+const slider = document.querySelector('.slider');
+
+const goToSlide = function (slide) {
+  slides.forEach(
+    (s, i) => (s.style.transform = `translateX(${100 * (i - slide)}%)`)
+  );
+};
+
+goToSlide(0);
+
+const nextSlide = function () {
+  // Go back to first slide when reaching the end
+  if (curSlide === maxSlide - 1) {
+    curSlide = 0;
+  } else {
+    curSlide++;
+  }
+
+  goToSlide(curSlide);
+  activateDot(curSlide);
+};
+
+const prevSlide = function () {
+  // Go to the end slide when reaching past the beginning
+  if (curSlide === 0) {
+    curSlide = maxSlide - 1;
+  } else {
+    curSlide--;
+  }
+
+  goToSlide(curSlide);
+  activateDot(curSlide);
+};
+
+// Next slide
+btnRight.addEventListener('click', nextSlide);
+btnLeft.addEventListener('click', nextSlide);
+
+// Also arrow keys to move slides
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'ArrowLeft') prevSlide();
+  if (e.key === 'ArrowRight') nextSlide();
+});
+
+dotContainer.addEventListener('click', function (e) {
+  if (e.target.classList.contains('dots__dot')) {
+    const { slide } = e.target.dataset;
+
+    goToSlide(slide);
+    activateDot(slide);
+  }
 });
